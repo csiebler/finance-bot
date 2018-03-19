@@ -21,7 +21,7 @@ var connector = useEmulator ? new builder.ChatConnector() : new azure.BotService
 var azureTableClient = new azure.AzureTableClient(tableName, storageName, storageKey);
 var tableStorage = new azure.AzureBotStorage({gzipData: false}, azureTableClient);
 
-var bot = new builder.UniversalBot(connector, '/');
+var bot = new builder.UniversalBot(connector);
 bot.localePath(path.join(__dirname, './locale'));
 bot.set('storage', tableStorage);
 bot.set('persistUserData', true);
@@ -41,8 +41,9 @@ bot.on('conversationUpdate', function (message) {
             if (identity.id === message.address.bot.id) {
                 var welcomeMessage = new builder.Message()
                     .address(message.address)
-                    .text("Hello, I'm your personal finance tracker bot! How are you?");
+                    .text("Hello, I'm your personal finance tracker bot!");
                 bot.send(welcomeMessage);
+                bot.beginDialog(message.address, '/')
             }
         });
     }
@@ -50,12 +51,21 @@ bot.on('conversationUpdate', function (message) {
 
 // Welcome back/query name dialog
 bot.dialog('/', [
+    function(session){
+        session.beginDialog('greeting');
+    },
+    function(session) {
+        session.beginDialog('selectAction');
+    }
+]);
+
+bot.dialog('greeting', [
     function(session) {
         var username = session.userData.userName;
         if (!username) {
             builder.Prompts.text(session, "What is your name?");
         } else {
-            session.send("Welcome back, %s", username);
+            session.endDialog("Welcome back, %s", username);
         }
     },
     function(session, results) {
@@ -63,16 +73,50 @@ bot.dialog('/', [
             session.userData.userName = results.response;
             session.send("Welcome %s! I'll remember your name from now on!", session.userData.userName);
         }
-        session.beginDialog('/echo');
+        session.endDialog();
     }
 ]);
 
-// Basic echo dialog, keeps going forever
-bot.dialog('/echo', function(session) {
-    var username = session.userData.userName;
-    session.send("Thanks %s, you said: %s", username, session.message.text)
-});
+var options = {
+    'Add expense': 'addExpense',
+    'Show recent expenses': 'showExpenses',
+    'Show monthly spend': 'showSpend' 
+};
 
+bot.dialog('selectAction', [
+    function(session) {
+        var style = { listStyle: builder.ListStyle.button };
+        builder.Prompts.choice(session, "How can I help you?", Object.keys(options), style);
+    },
+    function(session, results) {
+        var action = options[results.response.entity];
+        return session.beginDialog(action);
+    },
+    function(session) {
+        // keep going forever
+        session.replaceDialog('selectAction');
+    }
+]);
+
+bot.dialog('addExpense', [
+    function(session) {
+        session.send("Tell me more about what you bought!");  
+        session.endDialog("Expenses added!");  
+    }
+]);
+
+bot.dialog('showExpenses', [
+    function(session) {
+        session.send("You logged the following purchases: aaaa");
+        session.endDialog("That's all for now!");
+    }
+]);
+
+bot.dialog('showSpend', [
+    function(session) {
+        session.endDialog("Your current spent in this month is $123");
+    }
+]);
 
 if (useEmulator) {
     var restify = require('restify');
