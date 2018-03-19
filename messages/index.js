@@ -26,14 +26,6 @@ bot.localePath(path.join(__dirname, './locale'));
 bot.set('storage', tableStorage);
 bot.set('persistUserData', true);
 
-    /*
-    userData, privateConversationData, and conversationData persisted after session ends
-    session.userData --> Saved for channel across conversations
-    session.privateConversationData --> Saved for channel and conversation only
-    session.conversationData --> saved in context of cur conversation but shared with all users in grp
-    session.dialogData --> removed once dialog ends
-    */
-
 // Add first run dialog
 bot.on('conversationUpdate', function (message) {
     if (message.membersAdded && message.membersAdded.length > 0) {
@@ -83,9 +75,10 @@ var options = {
     'Show monthly spend': 'showSpend' 
 };
 
+var style = { listStyle: builder.ListStyle.button };
+
 bot.dialog('selectAction', [
     function(session) {
-        var style = { listStyle: builder.ListStyle.button };
         builder.Prompts.choice(session, "How can I help you?", Object.keys(options), style);
     },
     function(session, results) {
@@ -100,8 +93,24 @@ bot.dialog('selectAction', [
 
 bot.dialog('addExpense', [
     function(session) {
-        session.send("Tell me more about what you bought!");  
-        session.endDialog("Expenses added!");  
+        builder.Prompts.text(session, "Ok, let's log an expense - where did you purchase something?");
+    },
+    function(session, results) {
+        session.dialogData.vendor = results.response;
+        builder.Prompts.number(session, "How much did you spend?");
+    },
+    function(session, results) {
+        session.dialogData.price = results.response;
+        var vendor = session.dialogData.vendor;
+        var price = session.dialogData.price;
+        var message = `You spent ${price} at ${vendor}, is this correct?`;
+        builder.Prompts.choice(session, message, "Yes|No", style);
+    },function(session, results) {
+        if (results.response.entity.match(/yes/i)) {
+            session.endDialog("Expenses added!");  
+        } else {
+            session.endDialog("Discarded!");  
+        }
     }
 ]);
 
