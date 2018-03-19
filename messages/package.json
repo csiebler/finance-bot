@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "azure-storage": "^2.8.1",
     "botbuilder": "^3.13.1",
     "botbuilder-azure": "^3.0.4",
     "dotenv": "^5.0.1"
